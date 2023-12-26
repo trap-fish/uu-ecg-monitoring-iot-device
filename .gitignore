@@ -1,0 +1,13 @@
+# virtual environement
+.venv*
+
+# environment variables
+.env
+
+# mqtt files
+*/mosquitto/log*
+*/mosquitto/data*
+*/mosquitto/passwd_file
+
+# MCU Connection variables
+secrets.h
