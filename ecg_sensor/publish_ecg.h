@@ -25,6 +25,13 @@ MCP3208 adc(vref,csPin);
 unsigned long lastPublished = 0;
 unsigned const long publishInterval = 1 * 50L;
 
+// variables for the bpm calculation
+uint16_t beatsPerMin = 0;
+unsigned long int  previousQRS = 0;
+const uint16_t upThreshold = 850;
+const uint16_t lowThreshold = 700;
+bool isQRS = false;
+
 // init the Wifi client and MQTT client libraries
 WiFiClient wifiClient;
 MQTTClient mqttClient;
@@ -75,6 +82,8 @@ void loop() {
 
   // reset lastPublished if using the delay interval
   //lastPublished = millis();
+
+  calculateBPM(val); // calculate the BPM
 }
 
 // conneccts to WiFi and MQTT Broker
@@ -108,4 +117,21 @@ String getPayload(String measurement, int voltage) {
     String fluxLine = measurement + ",device=device1" + " ecg=" + String(voltage);
 
     return fluxLine;
+}
+
+// calculates the BPM
+void calculateBPM(uint16_t reading) {
+  // set QRS flag to true if over threshold and not already true
+  if (reading > upThreshold && isQRS == false) {
+    isQRS = true;
+    unsigned long int currentQRS = millis(); // update the new QRS time
+    unsigned long int rInterval = currentQRS - previousQRS;
+    previousQRS = currentQRS; // update the previousQRS for the next call
+    uint16_t bpm = 60000 / rInterval;
+    Serial.print(bpm);
+  } 
+  // set flag to false if lower threshold is passed
+  else if (reading < lowThreshold && isQRS == true) {
+    isQRS = false;
+  }
 }
