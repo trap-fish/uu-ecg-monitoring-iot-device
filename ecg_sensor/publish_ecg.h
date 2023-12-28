@@ -83,7 +83,15 @@ void loop() {
   // reset lastPublished if using the delay interval
   //lastPublished = millis();
 
-  calculateBPM(val); // calculate the BPM
+  // set QRS flag to true if over threshold and not already true
+  if (val > upThreshold && isQRS == false) {
+    isQRS = true;
+    calculateBPM();
+    Serial.println(beatsPerMin);
+  } // set flag to false if lower threshold is passed
+  else if (val < lowThreshold && isQRS == true) {
+    isQRS = false;
+  }
 }
 
 // conneccts to WiFi and MQTT Broker
@@ -115,23 +123,14 @@ void connect() {
 // format into an Influx line protocol
 String getPayload(String measurement, int voltage) {
     String fluxLine = measurement + ",device=device1" + " ecg=" + String(voltage);
-
     return fluxLine;
 }
 
+
 // calculates the BPM
-void calculateBPM(uint16_t reading) {
-  // set QRS flag to true if over threshold and not already true
-  if (reading > upThreshold && isQRS == false) {
-    isQRS = true;
+void calculateBPM() {
     unsigned long int currentQRS = millis(); // update the new QRS time
     unsigned long int rInterval = currentQRS - previousQRS;
     previousQRS = currentQRS; // update the previousQRS for the next call
-    uint16_t bpm = 60000 / rInterval;
-    Serial.print(bpm);
-  } 
-  // set flag to false if lower threshold is passed
-  else if (reading < lowThreshold && isQRS == true) {
-    isQRS = false;
-  }
+    beatsPerMin = 60000 / rInterval;
 }
