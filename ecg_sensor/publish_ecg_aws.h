@@ -24,10 +24,6 @@ const uint32_t clock = 1600000;
 // init Mcp320x object, using MCP3208 namespace
 MCP3208 adc(vref, csPin);
 
-// setup the publishing intervals
-unsigned long lastPublished = 0;
-unsigned const long publishInterval = 1 * 50L;
-
 
 // variables for the bpm calculation
 uint16_t beatsPerMin = 0;
@@ -42,7 +38,6 @@ MqttClient mqttClient(sslClient);
 
 // for json string, increases each iteration
 uint32_t measurement_id = 0;
-uint64_t measureStartTime = 0;
 
 
 void setup() {
@@ -88,22 +83,8 @@ void loop() {
 
   // read from ADC MCP3208 via SPI
   uint16_t raw = adc.read(MCP3208::Channel::SINGLE_3);  // read data from CH3
-  uint16_t val = adc.toAnalog(raw);                     // get analog conversion of data
-
-  // sends data after a delay interval, uncomment to publish every publishInterval ms
-  //while(millis() - lastPublished < publishInterval){
-  //}
-
-  // ensure timestamp is not zero
-  while (measureStartTime == 0) {
-    Serial.println("Establishing Measurement Timestamp");
-    // minus millis, ugly way to remove lasped time since startup
-    measureStartTime = sessionStartTime() - millis()/1000;
-    Serial.println(".");
-    delay(2000);
-  }
-  uint64_t measurement_time = startTimeToMillis(measureStartTime);
-  uint16_t measurement = val;
+  uint16_t measurement = adc.toAnalog(raw);                     // get analog conversion of data
+  
   measurement_id++;
 
   // define the thresholds for R wave detection
@@ -118,31 +99,9 @@ void loop() {
     isQRS = false;
   }
 
-  publishJson(measurement_time, measurement_id, measurement, beatsPerMin);
-  // reset lastPublished if using the delay interval
-  //lastPublished = millis();
+  publishJson(measurement_id, measurement, beatsPerMin);
 }
 
-
-String uint64ToString(uint64_t val) {
-    char buffer[21];
-    char* ndx = &buffer[sizeof(buffer) - 1];
-    *ndx = '\0';
-    do {
-      *--ndx = val % 10 + '0';
-      val = val  / 10;
-    } while (val != 0);
-    return(String(ndx));
-}
-
-// adds millis to the start time
-uint64_t startTimeToMillis(int64_t session_ts) {
-  //seems to be a bug, time is exactly 24hrs behind
-  uint64_t today = session_ts + 86400;
-  //convert to ms and add millis
-  uint64_t measure_ts = (today * 1000) + millis();
-  return measure_ts;
-}
 
 // conneccts to WiFi and MQTT Broker
 void connectWiFi() {
@@ -175,9 +134,7 @@ unsigned long sessionStartTime() {
   return WiFi.getTime();
 }
 
-void publishJson(uint64_t timestamp, uint16_t id, uint16_t ecg, uint16_t bpm) {
-  // convert timestamp to string
-  String measure_ts = uint64ToString(timestamp);
+void publishJson(uint16_t id, uint16_t ecg, uint16_t bpm) {
 
   // define the mqtt topic to publish to, 
   // use QoS=1 at least once, DB will overwrite duplicates
@@ -185,18 +142,14 @@ void publishJson(uint64_t timestamp, uint16_t id, uint16_t ecg, uint16_t bpm) {
 
   // generate the JSON string
   String jsonString = "{";
-  jsonString += "\"measurement_time\":" + measure_ts + ",";
   jsonString += "\"measurement_id\":" + String(id) + ",";
   jsonString += "\"measurement\":" + String(ecg) + ",";
-  jsonString += "\"heart_rate\":" + String(bpm) + ",";
+  jsonString += "\"heart_rate\":" + String(bpm);
   jsonString += "}";
 
   //publish and close
   mqttClient.print(jsonString);
   mqttClient.endMessage();
-
-  // print to serial, only needed for debugging
-  Serial.println(jsonString);
 }
 
 // calculates the BPM
