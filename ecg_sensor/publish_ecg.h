@@ -72,7 +72,7 @@ void loop() {
   uint16_t val = adc.toAnalog(raw); // get analog conversion of data
 
   // converts data into an influxDB line protocol format
-  String payload1 = getPayload("ecg_001", val);
+  String payload1 = getPayload("ecg_001", val, beatsPerMin);
 
   // sends data after a delay interval, uncomment to publish every publishInterval ms
   //while(millis() - lastPublished < publishInterval){
@@ -121,8 +121,8 @@ void connect() {
 }
 
 // format into an Influx line protocol
-String getPayload(String measurement, int voltage) {
-    String fluxLine = measurement + ",device=device1" + " ecg=" + String(voltage);
+String getPayload(String measurement, int voltage, int bpm) {
+    String fluxLine = measurement + ",device=device1" + " ecg=" + String(voltage),"bpm=" + String(bpm);
     return fluxLine;
 }
 
